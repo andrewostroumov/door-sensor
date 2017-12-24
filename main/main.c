@@ -1,9 +1,8 @@
 // TODO: How to config constants in file?
-// TODO: add timestamp last event occur to prevent double sending request
-// TODO: request sends only once
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <driver/gpio.h>
 
 #include <freertos/FreeRTOS.h>
@@ -28,6 +27,7 @@
 #define WIFI_PASS "samsung7"
 
 #define CONFIG_WEBSITE "www.google.com"
+#define EVENT_DELAY 2000
 
 static EventGroupHandle_t wifi_event_group;
 const int CONNECTED_BIT = BIT0;
@@ -86,6 +86,11 @@ void make_post_request(char **request, char *path, char *body, char *type) {
 }
 
 void send_request(char *request) {
+    printf("HTTP request:\n");
+    printf("--------------------------------------------------------------------------------\n");
+    printf(request);
+    printf("--------------------------------------------------------------------------------\n");
+
     const struct addrinfo hints = {
         .ai_family = AF_INET,
         .ai_socktype = SOCK_STREAM,
@@ -145,26 +150,36 @@ void send_request(char *request) {
     printf("Socket closed\n");
 }
 
-void send_event_request() {
+void send_post_request(char *path, char *body) {
     char *request = "";
-    char *body = "{\"event\":\"open\"}";
-    make_post_request(&request, "/", body, "application/json");
-    printf("HTTP request:\n");
-    printf("--------------------------------------------------------------------------------\n");
-    printf(request);
-    printf("--------------------------------------------------------------------------------\n");
+    make_post_request(&request, path, body, "application/json");
     send_request(request);
 }
 
+void send_door_event_request(void *arg) {
+    char *body = "{\"message\":\"front_door_opened\"}";
+    send_post_request("/", body);
+}
+
+
 void sensor_task(void* arg) {
+    TickType_t last_tick = xTaskGetTickCount();
+    TickType_t tick;
     for(;;) {
         if(xSemaphoreTake(xSemaphore, portMAX_DELAY) == pdTRUE) {
-            printf("Event on door");
+            tick = xTaskGetTickCount();
+            if ((tick - last_tick) * portTICK_RATE_MS < EVENT_DELAY) {
+                continue;
+            } else {
+                last_tick = tick;
+            }
+
+            printf("Front door opened\n");
             EventBits_t wifi_bits;
             wifi_bits = xEventGroupGetBits(wifi_event_group);
             if (wifi_bits & CONNECTED_BIT) {
                 printf("Sending request...");
-                send_event_request();
+                xTaskCreate(&send_door_event_request, "send_door_event_request", 4096, NULL, 5, NULL);
             }
         }
     }
@@ -175,7 +190,6 @@ void wifi_task(void *pvParameter) {
     printf("Waiting for connection to the wifi network...\n");
     xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, portMAX_DELAY);
     printf("Connected!\n");
-    // queue here
     while(1) {
         vTaskDelay(1000 / portTICK_RATE_MS);
     }
