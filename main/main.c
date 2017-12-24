@@ -23,11 +23,6 @@
 #define ESP_INTR_FLAG_DEFAULT 0
 #define SENSOR_PIN 12
 
-#define WIFI_SSID "Xiaomi"
-#define WIFI_PASS "samsung7"
-
-#define SERVER_IP "51.15.209.85"
-#define SERVER_PORT 80
 #define EVENT_DELAY 2000
 
 static EventGroupHandle_t wifi_event_group;
@@ -90,23 +85,23 @@ void send_request(char *request) {
     char recv_buf[100];
     struct sockaddr_in server;
     server.sin_family = AF_INET;
-    server.sin_port = htons(SERVER_PORT);
-    server.sin_addr.s_addr = inet_addr(SERVER_IP);
+    server.sin_port = htons(strtol(CONFIG_SERVER_PORT, NULL, 10));
+    server.sin_addr.s_addr = inet_addr(CONFIG_SERVER_IP);
 
     int s = socket(AF_INET, SOCK_STREAM, 0);
     if(s < 0) {
         printf("Unable to allocate a new socket\n");
-        while(1) vTaskDelay(1000 / portTICK_RATE_MS);
+        return;
     }
-    printf("Socket allocated, id=%d\n", s);
+    printf("Socket allocated: %d\n", s);
 
     int result = connect(s, (struct sockaddr *)&server, sizeof(server));
     if(result != 0) {
-        printf("Unable to connect to the target website\n");
+        printf("Unable to connect to: %s:%s\n", CONFIG_SERVER_IP:CONFIG_SERVER_PORT);
         close(s);
-        while(1) vTaskDelay(1000 / portTICK_RATE_MS);
+        return;
     }
-    printf("Connected to: %s\n", SERVER_IP);
+    printf("Connected to: %s:%s\n", CONFIG_SERVER_IP:CONFIG_SERVER_PORT);
 
     printf("HTTP request:\n");
     printf("--------------------------------------------------------------------------------\n");
@@ -117,7 +112,7 @@ void send_request(char *request) {
         if(result < 0) {
         printf("Unable to send the HTTP request\n");
         close(s);
-        while(1) vTaskDelay(1000 / portTICK_RATE_MS);
+        return;
     }
     printf("HTTP request sent\n");
 
@@ -177,7 +172,7 @@ void sensor_task(void* arg) {
 }
 
 void wifi_task(void *pvParameter) {
-    printf("Connecting to %s\n", WIFI_SSID);
+    printf("Connecting to %s\n", CONFIG_WIFI_SSID);
     printf("Waiting for connection to the wifi network...\n");
     xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT, false, true, portMAX_DELAY);
     printf("Connected!\n");
@@ -231,8 +226,8 @@ void app_main(void) {
 
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid = WIFI_SSID,
-            .password = WIFI_PASS,
+            .ssid = CONFIG_WIFI_SSID,
+            .password = CONFIG_WIFI_PASSWORD,
         },
     };
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));

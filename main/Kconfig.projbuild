@@ -1,0 +1,23 @@
+menu "Configuration"
+
+	config WIFI_SSID
+		string "WIFI Network SSID"
+		help
+			Enter the SSID of the wifi network
+
+	config WIFI_PASSWORD
+		string "WIFI Network Password"
+		help
+			Enter the password of the wifi network
+
+	config SERVER_IP
+		string "Server IP"
+		help
+			Enter the server port
+	
+	config SERVER_PORT
+		string "Server post"
+		help
+			Enter the server port
+	
+endmenu
