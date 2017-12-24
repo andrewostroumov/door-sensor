@@ -97,11 +97,11 @@ void send_request(char *request) {
 
     int result = connect(s, (struct sockaddr *)&server, sizeof(server));
     if(result != 0) {
-        printf("Unable to connect to: %s:%s\n", CONFIG_SERVER_IP:CONFIG_SERVER_PORT);
+        printf("Unable to connect to: %s:%s\n", CONFIG_SERVER_IP, CONFIG_SERVER_PORT);
         close(s);
         return;
     }
-    printf("Connected to: %s:%s\n", CONFIG_SERVER_IP:CONFIG_SERVER_PORT);
+    printf("Connected to: %s:%s\n", CONFIG_SERVER_IP, CONFIG_SERVER_PORT);
 
     printf("HTTP request:\n");
     printf("--------------------------------------------------------------------------------\n");
