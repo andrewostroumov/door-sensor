@@ -26,7 +26,8 @@
 #define WIFI_SSID "Xiaomi"
 #define WIFI_PASS "samsung7"
 
-#define CONFIG_WEBSITE "www.google.com"
+#define SERVER_IP "51.15.209.85"
+#define SERVER_PORT 80
 #define EVENT_DELAY 2000
 
 static EventGroupHandle_t wifi_event_group;
@@ -59,18 +60,13 @@ void cats(char **str, const char *str2) {
         memcpy( *str + strlen(*str), str2, strlen(str2) );
         free(tmp);
     }
-
 }
 
 void make_base_request(char **request, char *method, char *path) {
     char buf[64];
     sprintf(buf, "%s %s HTTP/1.1\n", method, path);
     cats(request, buf);
-    cats(
-        request,
-        "Host: "CONFIG_WEBSITE"\n"
-        "User-Agent: ESP32\n"
-    );
+    cats(request, "User-Agent: ESP32\n");
 }
 
 void make_post_request(char **request, char *path, char *body, char *type) {
@@ -85,46 +81,38 @@ void make_post_request(char **request, char *path, char *body, char *type) {
     cats(request, "\n");
 }
 
+void make_get_request(char **request, char *path) {
+    make_base_request(request, "GET", path);
+    cats(request, "\n");
+}
+
 void send_request(char *request) {
-    printf("HTTP request:\n");
-    printf("--------------------------------------------------------------------------------\n");
-    printf(request);
-    printf("--------------------------------------------------------------------------------\n");
-
-    const struct addrinfo hints = {
-        .ai_family = AF_INET,
-        .ai_socktype = SOCK_STREAM,
-    };
-
-    struct addrinfo *res;
     char recv_buf[100];
+    struct sockaddr_in server;
+    server.sin_family = AF_INET;
+    server.sin_port = htons(SERVER_PORT);
+    server.sin_addr.s_addr = inet_addr(SERVER_IP);
 
-    // resolve the IP of the target website
-    int result = getaddrinfo(CONFIG_WEBSITE, "80", &hints, &res);
-    if((result != 0) || (res == NULL)) {
-        printf("Unable to resolve IP for target website %s\n", CONFIG_WEBSITE);
-        while(1) vTaskDelay(1000 / portTICK_RATE_MS);
-    }
-    printf("Target website's IP resolved: %s\n", inet_ntoa(res->ai_addr));
-
-    // create a new socket
-    int s = socket(res->ai_family, res->ai_socktype, 0);
+    int s = socket(AF_INET, SOCK_STREAM, 0);
     if(s < 0) {
         printf("Unable to allocate a new socket\n");
         while(1) vTaskDelay(1000 / portTICK_RATE_MS);
     }
     printf("Socket allocated, id=%d\n", s);
 
-    // connect to the specified server
-    result = connect(s, res->ai_addr, res->ai_addrlen);
+    int result = connect(s, (struct sockaddr *)&server, sizeof(server));
     if(result != 0) {
         printf("Unable to connect to the target website\n");
         close(s);
         while(1) vTaskDelay(1000 / portTICK_RATE_MS);
     }
-    printf("Connected to the target website\n");
+    printf("Connected to: %s\n", SERVER_IP);
 
-    // send the request
+    printf("HTTP request:\n");
+    printf("--------------------------------------------------------------------------------\n");
+    printf(request);
+    printf("--------------------------------------------------------------------------------\n");
+
     result = write(s, request, strlen(request));
         if(result < 0) {
         printf("Unable to send the HTTP request\n");
@@ -133,7 +121,6 @@ void send_request(char *request) {
     }
     printf("HTTP request sent\n");
 
-    // print the response
     printf("HTTP response:\n");
     printf("--------------------------------------------------------------------------------\n");
     int r;
@@ -156,11 +143,16 @@ void send_post_request(char *path, char *body) {
     send_request(request);
 }
 
-void send_door_event_request(void *arg) {
-    char *body = "{\"message\":\"front_door_opened\"}";
-    send_post_request("/", body);
+void send_get_request(char *path) {
+    char *request = "";
+    make_get_request(&request, path);
+    send_request(request);
 }
 
+void send_door_event_request() {
+    char *body = "{\"message\":\"front_door_trigger\"}";
+    send_post_request("/event", body);
+}
 
 void sensor_task(void* arg) {
     TickType_t last_tick = xTaskGetTickCount();
@@ -178,8 +170,7 @@ void sensor_task(void* arg) {
             EventBits_t wifi_bits;
             wifi_bits = xEventGroupGetBits(wifi_event_group);
             if (wifi_bits & CONNECTED_BIT) {
-                printf("Sending request...");
-                xTaskCreate(&send_door_event_request, "send_door_event_request", 4096, NULL, 5, NULL);
+                send_door_event_request();
             }
         }
     }
