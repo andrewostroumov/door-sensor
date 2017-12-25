@@ -1,5 +1,3 @@
-// TODO: How to config constants in file?
-
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -61,6 +59,8 @@ void make_base_request(char **request, char *method, char *path) {
     char buf[64];
     sprintf(buf, "%s %s HTTP/1.1\n", method, path);
     cats(request, buf);
+    cats(request, "Host: "CONFIG_SERVER_IP"\n");
+    cats(request, "Authorization: "CONFIG_AUTH_TOKEN"\n");
     cats(request, "User-Agent: ESP32\n");
 }
 
@@ -121,11 +121,11 @@ void send_request(char *request) {
     int r;
     do {
         bzero(recv_buf, sizeof(recv_buf));
-        r = read(s, recv_buf, sizeof(recv_buf) - 1);
+        r = read(s, recv_buf, sizeof(recv_buf));
         for(int i = 0; i < r; i++) {
             putchar(recv_buf[i]);
         }
-    } while(r > 0);
+    } while(r >= sizeof(recv_buf));
     printf("--------------------------------------------------------------------------------\n");
 
     close(s);
@@ -146,7 +146,7 @@ void send_get_request(char *path) {
 
 void send_door_event_request() {
     char *body = "{\"message\":\"front_door_trigger\"}";
-    send_post_request("/event", body);
+    send_post_request("/events", body);
 }
 
 void sensor_task(void* arg) {

@@ -19,5 +19,10 @@ menu "Configuration"
 		string "Server post"
 		help
 			Enter the server port
+
+	config AUTH_TOKEN
+		string "Auth token"
+		help
+			Enter the auth token
 	
 endmenu
